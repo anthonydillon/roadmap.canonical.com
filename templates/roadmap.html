@@ -34,19 +34,23 @@
   [data-status="unknown"] .dot,
   .dot[data-status="unknown"] { box-shadow: inset 0 0 0 1.5px var(--border-strong); }
 
-  /* Status chips use Vanilla's p-chip; the dot tells apart the statuses
-     that share the neutral chip (Added, Dropped, Inactive). */
-  .item__status { justify-self: start; white-space: nowrap; }
-  .item__status .dot { width: 7px; height: 7px; margin-right: 6px; align-self: center; }  /* chip aligns to baseline */
-  /* Completed: Vanilla positive chip, filled dark green with white text. */
-  .item__status.is-completed,
-  .item__status.is-completed:hover {
-    background-color: var(--status-completed);
-    border-color: var(--status-completed);
+  /* Status square: solid status colour, with the Jira label (e.g. "C") inside. */
+  .status-square {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: 1px solid rgba(0, 0, 0, .15);
+    border-radius: 2px;
+    background: var(--status);
     color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    text-transform: uppercase;
   }
-  .item__status.is-completed .p-chip__value { color: #fff; }
-  .item__status.is-completed .dot { background: #fff; }
+  .status-square[data-status="unknown"] { border-color: var(--border-strong); color: var(--text-muted); }
 
   /* ── segmented progress bars ────────────────────────────────────── */
   .seg-bar {
@@ -153,7 +157,7 @@
   button.link-button[hidden] { display: none; }
   button.status-filter__row {
     display: grid;
-    grid-template-columns: 12px 1fr auto;
+    grid-template-columns: 20px 1fr auto;
     align-items: center;
     gap: 10px;
     padding: 7px 8px;
@@ -168,7 +172,6 @@
   button.status-filter__row:hover { background: #ececec; }
   button.status-filter__row[aria-pressed="true"] { background: #e2e2e2; }
   .status-filter__row.is-empty { opacity: .45; }
-  .status-filter__row .dot { width: 10px; height: 10px; }
   .status-filter__count {
     font-size: 12px;
     color: var(--text-muted);
@@ -254,9 +257,6 @@
 
   /* ── main header ────────────────────────────────────────────────── */
   .page-header {
-    position: sticky;
-    top: 0;
-    z-index: 2;
     padding: 20px 32px 0;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
@@ -330,8 +330,8 @@
     background: var(--brand);
     transform: rotate(45deg);
   }
-  .group { padding: 8px 0; border-bottom: 1px solid #eee; }
-  .group__head { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+  .group { padding: 6px 0; border-bottom: 1px solid #eee; }
+  .group__head { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
   button.group__toggle,
   button.group__toggle:hover,
   button.group__toggle[aria-expanded] {
@@ -357,16 +357,16 @@
   .group__spacer { flex: 1; }
   .group__epic,
   .group__epic:visited { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
-  .group__items { list-style: none; margin: 0; padding: 0 0 8px 24px; }
+  .group__items { list-style: none; margin: 0; padding: 0 0 6px 24px; }
   .group__items[hidden] { display: none; }
 
   .item {
     display: grid;
-    grid-template-columns: 132px minmax(0, 1fr) auto;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 16px;
+    gap: 14px;
     margin: 0 -10px;
-    padding: 8px 10px;
+    padding: 6px 10px;
     border-radius: 2px;
   }
   .item:hover { background: var(--bg-hover); }
@@ -375,7 +375,7 @@
   .item.is-current .item__title:focus,
   .board-card.is-current .board-card__title:focus { outline: none; }
   .item__title,
-  .item__title:visited { font-size: 15px; color: var(--text); text-wrap: pretty; }
+  .item__title:visited { font-size: 15px; line-height: 1.3; color: var(--text); text-wrap: pretty; }
   .item__meta { display: flex; align-items: center; gap: 12px; }
   .item__jira,
   .item__jira:visited { font-size: 12px; color: var(--text-faint); }
@@ -440,15 +440,14 @@
   /* ── small screens ──────────────────────────────────────────────── */
   @media (max-width: 768px) {
     .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
-    .page-header { position: static; padding: 16px 16px 0; }
+    .page-header { padding: 16px 16px 0; }
     .page-header__tools { width: 100%; }
     input.search { flex: 1; width: auto; min-width: 0; }
     .list-view { padding: 8px 16px 80px; }
     .board-view { padding: 16px 16px 48px; }
     .group__items { padding-left: 0; }
     .group__head .seg-bar--sm { display: none; }
-    .item { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; }
-    .item__status { grid-column: 1 / -1; }
+    .item { gap: 6px 12px; }
   }
 </style>
 {% endblock %}
@@ -508,7 +507,7 @@
     </div>
     {% for sid, slabel in statuses %}
     <button type="button" class="status-filter__row" data-status="{{ sid }}" aria-pressed="false">
-      <span class="dot"></span>
+      <span class="status-square" data-status="{{ sid }}" aria-hidden="true">{{ 'C' if sid == 'completed' }}</span>
       <span>{{ slabel }}</span>
       <span class="status-filter__count">0</span>
     </button>
@@ -550,16 +549,9 @@
     {% else %}
       {% set health_id = 'unknown' %}
     {% endif %}
-    {% set chip_modifier = {
-      'completed': '--positive is-completed',
-      'in-progress': '--positive',
-      'added': '--information',
-      'at-risk': '--caution',
-      'rejected': '--negative',
-    }.get(health_id, '') %}
     <li class="item" data-status="{{ health_id }}">
-      <span class="p-chip{{ chip_modifier }} is-dense is-inline item__status" data-status="{{ health_id }}">
-        <span class="dot" aria-hidden="true"></span><span class="p-chip__value">{{ dict(statuses)[health_id] }}</span>
+      <span class="status-square" data-status="{{ health_id }}" title="{{ dict(statuses)[health_id] }}">
+        <span aria-hidden="true">{{ health_label }}</span><span class="u-off-screen">{{ dict(statuses)[health_id] }}</span>
       </span>
       <a class="item__title" href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title | truncate(120, True, '…') }}</a>
       <span class="item__meta">
@@ -864,7 +856,6 @@
     var items = listView.querySelectorAll('.item');
     var activeFilters = new Set();
     var VIEW_KEY = 'roadmap_view';
-    var header = document.querySelector('.page-header');
     var currentIdx = null;  // index into `items` of the keyboard-highlighted row
 
     items.forEach(function(row, i) { row.setAttribute('data-idx', i); });
@@ -1073,9 +1064,6 @@
       if (!el) { currentIdx = null; return; }
       el.classList.add('is-current');
       if (!keepFocus) el.querySelector('a').focus({ preventScroll: true });
-      // Keep the row clear of the sticky header when scrolling it into view.
-      var stickyHeader = getComputedStyle(header).position === 'sticky';
-      document.documentElement.style.scrollPaddingTop = stickyHeader ? (header.offsetHeight + 8) + 'px' : '';
       el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
 
