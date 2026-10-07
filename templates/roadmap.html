@@ -14,7 +14,7 @@
 
 {% block head %}
 <style>
-  /* ── status dots & pills ────────────────────────────────────────── */
+  /* ── status colours & squares ───────────────────────────────────── */
   [data-status="completed"]   { --status: var(--status-completed); }
   [data-status="in-progress"] { --status: var(--status-in-progress); }
   [data-status="at-risk"]     { --status: var(--status-at-risk); }
@@ -23,20 +23,10 @@
   [data-status="dropped"]     { --status: var(--status-dropped); }
   [data-status="unknown"]     { --status: var(--status-inactive); }
 
-  .dot {
-    display: inline-block;
-    flex-shrink: 0;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--status);
-  }
-  [data-status="unknown"] .dot,
-  .dot[data-status="unknown"] { box-shadow: inset 0 0 0 1.5px var(--border-strong); }
-
   /* Status square: solid status colour, with the Jira label (e.g. "C") inside. */
   .status-square {
     display: inline-flex;
+    flex-shrink: 0;
     align-items: center;
     justify-content: center;
     width: 20px;
@@ -51,6 +41,7 @@
     text-transform: uppercase;
   }
   .status-square[data-status="unknown"] { border-color: var(--border-strong); color: var(--text-muted); }
+  .status-square--sm { width: 14px; height: 14px; font-size: 8px; }
 
   /* ── segmented progress bars ────────────────────────────────────── */
   .seg-bar {
@@ -549,7 +540,17 @@
     {% else %}
       {% set health_id = 'unknown' %}
     {% endif %}
-    <li class="item" data-status="{{ health_id }}">
+    {# Added items have no board column of their own: they sit under
+       In progress, or Completed once Jira labels them "C".
+       Dropped items share the Missed column. #}
+    {% if health_id == 'added' %}
+      {% set board_id = 'completed' if health_label == 'C' else 'in-progress' %}
+    {% elif health_id == 'dropped' %}
+      {% set board_id = 'rejected' %}
+    {% else %}
+      {% set board_id = health_id %}
+    {% endif %}
+    <li class="item" data-status="{{ health_id }}" data-board="{{ board_id }}">
       <span class="status-square" data-status="{{ health_id }}" title="{{ dict(statuses)[health_id] }}">
         <span aria-hidden="true">{{ health_label }}</span><span class="u-off-screen">{{ dict(statuses)[health_id] }}</span>
       </span>
@@ -846,6 +847,13 @@
     if (!listView) return;
 
     var statuses = {{ statuses | tojson }};
+    // Board columns follow an item's lifecycle rather than the legend order.
+    // Added has no column; those items join In progress or Completed.
+    // Dropped items share the Missed column.
+    var boardColumns = ['unknown', 'in-progress', 'at-risk', 'completed', 'rejected'].map(function(id) {
+      var s = statuses.find(function(s) { return s[0] === id; });
+      return id === 'rejected' ? [id, 'Missed/Dropped'] : s;
+    });
     var boardView = document.getElementById('board-view');
     var listEmpty = document.getElementById('list-empty');
     var search = document.getElementById('item-search');
@@ -859,6 +867,16 @@
     var currentIdx = null;  // index into `items` of the keyboard-highlighted row
 
     items.forEach(function(row, i) { row.setAttribute('data-idx', i); });
+
+    // Same markup as the server-rendered squares: Completed carries a "C".
+    function statusSquare(id, modifier) {
+      var sq = document.createElement('span');
+      sq.className = 'status-square' + (modifier ? ' ' + modifier : '');
+      sq.setAttribute('data-status', id);
+      sq.setAttribute('aria-hidden', 'true');
+      if (id === 'completed') sq.textContent = 'C';
+      return sq;
+    }
 
     function countByStatus(rows) {
       var counts = {};
@@ -902,10 +920,7 @@
       statuses.forEach(function(s) {
         if (s[0] === 'unknown' || !counts[s[0]]) return;
         var el = add(' ' + counts[s[0]] + ' ' + s[1]);
-        var dot = document.createElement('span');
-        dot.className = 'dot';
-        dot.setAttribute('data-status', s[0]);
-        el.insertBefore(dot, el.firstChild);
+        el.insertBefore(statusSquare(s[0], 'status-square--sm'), el.firstChild);
       });
 
       statusRows.forEach(function(row) {
@@ -928,10 +943,10 @@
 
     function renderBoard() {
       boardView.innerHTML = '';
-      statuses.forEach(function(s) {
+      boardColumns.forEach(function(s) {
         var cards = [];
         items.forEach(function(row) {
-          if (row.getAttribute('data-status') === s[0] && isVisible(row)) cards.push(row);
+          if (row.getAttribute('data-board') === s[0] && isVisible(row)) cards.push(row);
         });
         if (!cards.length) return;
 
@@ -940,7 +955,7 @@
         col.setAttribute('data-status', s[0]);
         var head = document.createElement('div');
         head.className = 'board-col__head';
-        head.innerHTML = '<span class="dot"></span>';
+        head.appendChild(statusSquare(s[0]));
         head.appendChild(document.createTextNode(s[1]));
         var count = document.createElement('span');
         count.className = 'board-col__count';
@@ -953,7 +968,7 @@
           var card = document.createElement('div');
           card.className = 'board-card';
           card.setAttribute('data-idx', row.getAttribute('data-idx'));
-          card.setAttribute('data-status', s[0]);
+          card.setAttribute('data-status', row.getAttribute('data-status'));
           var group = document.createElement('div');
           group.className = 'board-card__group';
           group.textContent = row.closest('.group').querySelector('.group__name').textContent;
